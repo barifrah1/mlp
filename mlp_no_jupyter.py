@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, roc_auc_score, auc
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-import torch
+import torch as torch
 from torch import nn
 from torch.nn import functional as F
 import pdb
@@ -79,7 +79,7 @@ def infer(net, data, criterion):
         with torch.no_grad():
             pred = net(x).float()
             predictions[i] = pred
-            loss = criterion(pred, y).item()
+            loss = criterion(torch.tensor(pred.item()), y).item()
         running_loss += loss
     auc = roc_auc_score(data[1], predictions)
     return [running_loss / len(data[0]), auc]
@@ -118,7 +118,7 @@ def training_loop(
             optimizer.zero_grad()
             pred = net(x)
             predictions[i] = pred
-            loss = criterion(pred, y)
+            loss = criterion(pred, torch.tensor([y]))
             loss.backward()
             optimizer.step()
             running_tr_loss += loss
@@ -146,7 +146,7 @@ def training_loop(
         f"\n\t{auc_per_epoch} \n\tover the training epochs, respectively."
     )
 
-    return tr_loss, val_loss, test_loss, untrained_test_loss
+    return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch
 
 
 def plot_loss_graph(loss_list):
@@ -156,6 +156,16 @@ def plot_loss_graph(loss_list):
     plt.plot(epochs, loss_values, label='Training Loss by epoch')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
+    plt.legend()
+
+    plt.show()
+
+
+def plot_auc_graph(auc):
+    epochs = range(1, len(auc)+1)
+    plt.plot(epochs, auc, label='auc by epoch')
+    plt.xlabel('Epochs')
+    plt.ylabel('auc')
     plt.legend()
 
     plt.show()
@@ -179,8 +189,8 @@ def plot_decision_boundary(bias, a1, a2, X, Y):
     xd = np.array([xmin, xmax])
     yd = m*xd + c
     plt.plot(xd, yd, 'k', lw=1, ls='--')
-    plt.fill_between(xd, yd, ymin, color='tab:blue', alpha=0.2)
-    plt.fill_between(xd, yd, ymax, color='tab:orange', alpha=0.2)
+    plt.fill_between(xd, yd, ymin, color='tab:orange', alpha=0.2)
+    plt.fill_between(xd, yd, ymax, color='tab:blue', alpha=0.2)
     plt.scatter(*X[Y == 0].T, s=8, alpha=0.5)
     plt.scatter(*X[Y == 1].T, s=8, alpha=0.5)
     plt.xlim(xmin, xmax)
@@ -194,15 +204,17 @@ def plot_decision_boundary(bias, a1, a2, X, Y):
 in_features = x_train.shape[1]
 net = MlpLogisticClassifier(in_features)
 args = MlpArgs(1e-2, 20)
-tr_loss, val_loss, test_loss, untrained_test_loss = training_loop(args,
-                                                                  net,
-                                                                  (x_train,
-                                                                   y_train),
-                                                                  None,
-                                                                  (x_test, y_test),
-                                                                  nn.BCELoss
-                                                                  )
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch = training_loop(args,
+                                                                                 net,
+                                                                                 (x_train,
+                                                                                  y_train),
+                                                                                 None,
+                                                                                 (x_test,
+                                                                                  y_test),
+                                                                                 nn.BCELoss
+                                                                                 )
 plot_loss_graph(tr_loss)
+plot_auc_graph(auc_per_epoch)
 par = []
 for names, params in net.named_parameters():
     par.append(params)
