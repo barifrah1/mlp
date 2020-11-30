@@ -102,8 +102,8 @@ def training_loop(
     optimizer: the optimizer to be used"""
     criterion = criterion_func()
     optimizer = optimizer_func(net.parameters(), lr=args.lr)
-    tr_loss, val_loss, auc_per_epoch = [
-        None] * args.num_epochs, [None] * args.num_epochs, [None] * args.num_epochs
+    tr_loss, val_loss, auc_per_epoch, test_auc_per_epoch = [
+        None] * args.num_epochs, [None] * args.num_epochs, [None] * args.num_epochs, [None] * args.num_epochs
     test_loss, untrained_test_loss = None, None
     predictions = len(train[1]) * [None]
     # Note that I moved the inferences to a function because it was too much code duplication to read.
@@ -125,7 +125,9 @@ def training_loop(
         tr_loss[epoch] = running_tr_loss.item() / len(train[0])
         auc_per_epoch[epoch] = roc_auc_score(train[1], predictions)
         if validation:
-            val_loss[epoch] = infer(net, validation, criterion)
+            val_loss[epoch], test_auc_per_epoch[epoch] = infer(
+                net, validation, criterion)
+
     if test:
         test_loss = infer(net, test, criterion)
 
@@ -142,18 +144,22 @@ def training_loop(
     )
 
     print(
-        f"auc by epochs "
+        f"training auc by epochs "
         f"\n\t{auc_per_epoch} \n\tover the training epochs, respectively."
     )
+    print(
+        f"test auc by epochs "
+        f"\n\t{test_auc_per_epoch} \n\tover the training epochs, respectively."
+    )
 
-    return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch
+    return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch
 
 
-def plot_loss_graph(loss_list):
+def plot_loss_graph(loss_list, train_or_val: str):
     loss_values = loss_list
     epochs = range(1, len(loss_values)+1)
 
-    plt.plot(epochs, loss_values, label='Training Loss by epoch')
+    plt.plot(epochs, loss_values, label=f'{train_or_val} Loss by epoch')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
@@ -161,9 +167,9 @@ def plot_loss_graph(loss_list):
     plt.show()
 
 
-def plot_auc_graph(auc):
+def plot_auc_graph(auc, train_or_val: str):
     epochs = range(1, len(auc)+1)
-    plt.plot(epochs, auc, label='auc by epoch')
+    plt.plot(epochs, auc, label=f'{train_or_val} auc by epoch')
     plt.xlabel('Epochs')
     plt.ylabel('auc')
     plt.legend()
@@ -204,17 +210,20 @@ def plot_decision_boundary(bias, a1, a2, X, Y):
 in_features = x_train.shape[1]
 net = MlpLogisticClassifier(in_features)
 args = MlpArgs(1e-2, 20)
-tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch = training_loop(args,
-                                                                                 net,
-                                                                                 (x_train,
-                                                                                  y_train),
-                                                                                 None,
-                                                                                 (x_test,
-                                                                                  y_test),
-                                                                                 nn.BCELoss
-                                                                                 )
-plot_loss_graph(tr_loss)
-plot_auc_graph(auc_per_epoch)
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch = training_loop(args,
+                                                                                                     net,
+                                                                                                     (x_train,
+                                                                                                      y_train),
+                                                                                                     (x_test,
+                                                                                                      y_test),
+                                                                                                     (x_test,
+                                                                                                      y_test),
+                                                                                                     nn.BCELoss
+                                                                                                     )
+plot_loss_graph(tr_loss, "training")
+plot_loss_graph(val_loss, "validation")
+plot_auc_graph(auc_per_epoch, "training")
+plot_auc_graph(test_auc_per_epoch, "validation")
 par = []
 for names, params in net.named_parameters():
     par.append(params)
