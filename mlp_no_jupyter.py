@@ -9,6 +9,7 @@ from torch import nn
 from torch.nn import functional as F
 import pdb
 from tqdm import tqdm
+import seaborn as sns
 
 
 id_num_str = '312425036'  # input("Please Enter your Israeli ID?")
@@ -39,10 +40,10 @@ plt.colorbar()
 # plt.show()
 """
 ### START CODE HERE ###
-x_train = torch.from_numpy(x_train)
-y_train = torch.from_numpy(y_train)
-x_test = torch.from_numpy(x_test)
-y_test = torch.from_numpy(y_test)
+x_train = torch.from_numpy(x_train).float()
+y_train = torch.from_numpy(y_train).long()
+x_test = torch.from_numpy(x_test).float()
+y_test = torch.from_numpy(y_test).long()
 #x_train = x_train.double()
 
 
@@ -63,6 +64,17 @@ class MlpLogisticClassifier(nn.Module):
     def forward(self, x):
         x = x.float()
         x = torch.sigmoid(self.linear(x))
+        return x
+
+class MlpLogisticClassifierWithHidden(nn.Module):
+    def __init__(self, in_features,hidden_size):
+        super(MlpLogisticClassifierWithHidden, self).__init__()
+        self.fc1=nn.Linear(in_features,hidden_size)
+        self.output=nn.Linear(hidden_size,1)
+        
+    def forward(self, x):
+        x=F.relu(self.fc1(x))
+        x=torch.sigmoid(self.output(x))
         return x
 
 # infer function
@@ -206,10 +218,30 @@ def plot_decision_boundary(bias, a1, a2, X, Y):
 
     plt.show()
 
-
+def plot_decision_boundary_nonlinear(x,y,net,hidden_layers):
+    z = np.linspace(-3, 3, 50)
+    w = np.linspace(-3, 3, 40)
+    mesh = np.meshgrid(z, w)
+    a=np.zeros((2000,2))
+    a[:,0]=np.ravel(mesh[0])
+    a[:,1]=np.ravel(mesh[1])
+    contour_test=torch.Tensor(a)
+    predict_out = net(contour_test)
+    contour_plot=predict_out.detach().numpy()  
+    cmap = sns.diverging_palette(250, 12, s=85, l=25, as_cmap=True)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    contour=ax.contourf(mesh[0], mesh[1], contour_plot.reshape(40,50),20, cmap=cmap)
+    cbar = plt.colorbar(contour)
+    ax.scatter(x[y==0, 0], x[y==0, 1], label='Class 0')
+    ax.scatter(x[y==1, 0], x[y==1, 1], color='r', label='Class 1')
+    sns.despine(); ax.legend()
+    ax.set(xlabel='X', ylabel='Y', title='NN with {} layers'.format(hidden_layers))
+    plt.show()
+    
+    
 in_features = x_train.shape[1]
 net = MlpLogisticClassifier(in_features)
-args = MlpArgs(1e-2, 20)
+args = MlpArgs(2e-2, 50)
 tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch = training_loop(args,
                                                                                                      net,
                                                                                                      (x_train,
@@ -232,4 +264,23 @@ a1 = par[0][0][0].item()
 a2 = par[0][0][1].item()
 
 plot_decision_boundary(bias, a1, a2, x, y)
+#----------------- hidden net
+hidden_size=50
+net=MlpLogisticClassifierWithHidden(in_features,hidden_size)
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch = training_loop(args,
+                                                                                                     net,
+                                                                                                     (x_train,
+                                                                                                      y_train),
+                                                                                                     (x_test,
+                                                                                                      y_test),
+                                                                                                     (x_test,
+                                                                                                      y_test),
+                                                                                                     nn.BCELoss
+                                                                                                     )
+
+plot_loss_graph(tr_loss, "training")
+plot_loss_graph(val_loss, "validation")
+plot_auc_graph(auc_per_epoch, "training")
+plot_auc_graph(test_auc_per_epoch, "validation")
+plot_decision_boundary_nonlinear(x,y,net,hidden_size)
 print("end!")
