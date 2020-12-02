@@ -180,6 +180,12 @@ def training_loop(
 
     if test:
         test_loss = infer(net, test, criterion)
+        if not isinstance(net, MlpRegression):
+            with torch.no_grad():
+                y_pred = net(test[0]).numpy()
+            roc = roc_curve(test[1].numpy(), y_pred)
+            test_fpr = roc[0]
+            test_tpr = roc[1]
 
     print(f"Done training for {args.num_epochs} epochs.")
     # print(
@@ -203,7 +209,7 @@ def training_loop(
         )
 
     if not isinstance(net, MlpRegression):
-        return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch
+        return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr
     return tr_loss, val_loss, test_loss, untrained_test_loss
 
 
@@ -226,6 +232,21 @@ def plot_auc_graph(auc, train_or_val: str):
     plt.ylabel('auc')
     plt.legend()
 
+    plt.show()
+
+
+def plot_roc(fpr, tpr):
+    plt.figure()
+    lw = 2
+    plt.plot(fpr, tpr, color='darkorange',
+             lw=lw)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Roc curve on test set')
+    plt.legend(loc="lower right")
     plt.show()
 
 
@@ -278,28 +299,32 @@ def plot_decision_boundary_nonlinear(x, y, net, hidden_layers):
     ax.scatter(x[y == 1, 0], x[y == 1, 1], color='r', label='Class 1')
     sns.despine()
     ax.legend()
-    ax.set(xlabel='X', ylabel='Y', title='NN with {} layers'.format(hidden_layers))
+    ax.set(xlabel='X', ylabel='Y',
+           title='NN with {} neurons in hidden layer'.format(hidden_layers))
     plt.show()
 
 
-"""
 in_features = x_train.shape[1]
 net = MlpLogisticClassifier(in_features)
 args = MlpArgs(2e-2, 10)
-tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch = training_loop(args,
-                                                                                                     net,
-                                                                                                     (x_train,
-                                                                                                      y_train),
-                                                                                                     (x_test,
-                                                                                                      y_test),
-                                                                                                     (x_test,
-                                                                                                      y_test),
-                                                                                                     nn.BCELoss
-                                                                                                     )
+trainXandYTuple = (X_train, Y_train)
+testXandYTuple = (X_test, Y_test)
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr =
+training_loop(args, net, trainXandYTuple, testXandYTuple, nn.BCELoss)
+"""                                                                                                                        
+                                                                                                                            (x_train,
+                                                                                                                             y_train),
+                                                                                                                            (x_test,
+                                                                                                                             y_test),
+                                                                                                                            (x_test,
+                                                                                                                             y_test),
+                                                                                                                            nn.BCELoss
+                                                                                                                            )"""
 plot_loss_graph(tr_loss, "training")
 plot_loss_graph(val_loss, "validation")
 plot_auc_graph(auc_per_epoch, "training")
 plot_auc_graph(test_auc_per_epoch, "validation")
+plot_roc(test_fpr, test_tpr)
 par = []
 for names, params in net.named_parameters():
     par.append(params)
@@ -312,25 +337,26 @@ plot_decision_boundary(bias, a1, a2, x, y)
 hidden_size = 15
 args = MlpArgs(2e-2, 50)
 net = MlpLogisticClassifierWithHidden(in_features, hidden_size)
-tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch = training_loop(args,
-                                                                                                     net,
-                                                                                                     (x_train,
-                                                                                                      y_train),
-                                                                                                     (x_test,
-                                                                                                      y_test),
-                                                                                                     (x_test,
-                                                                                                      y_test),
-                                                                                                     nn.BCELoss
-                                                                                                     )
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr = training_loop(args,
+                                                                                                                         net,
+                                                                                                                         (x_train,
+                                                                                                                          y_train),
+                                                                                                                         (x_test,
+                                                                                                                          y_test),
+                                                                                                                         (x_test,
+                                                                                                                          y_test),
+                                                                                                                         nn.BCELoss
+                                                                                                                         )
 
 plot_loss_graph(tr_loss, "training")
 plot_loss_graph(val_loss, "validation")
 plot_auc_graph(auc_per_epoch, "training")
 plot_auc_graph(test_auc_per_epoch, "validation")
+plot_roc(test_fpr, test_tpr)
 plot_decision_boundary_nonlinear(x, y, net, hidden_size)
 print("end!")
 
-"""
+
 # -----------------------------regrresion
 np.random.seed(random_num)
 x = np.linspace(-5, 5, 30)
