@@ -57,14 +57,14 @@ class MlpArgs():
 
 
 class MlpLogisticClassifier(nn.Module):
-    def __init__(self, in_features,hidden_size):
+    def __init__(self, in_features, hidden_size):
         super(MlpLogisticClassifier, self).__init__()
-        self.fc1=nn.Linear(in_features,hidden_size)
-        self.output=nn.Linear(hidden_size,1)
+        self.fc1 = nn.Linear(in_features, hidden_size)
+        self.output = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
-        x=F.relu(self.fc1(x))
-        x=torch.sigmoid(self.output(x))
+        x = F.relu(self.fc1(x))
+        x = torch.sigmoid(self.output(x))
         return x
 
 # infer function
@@ -130,8 +130,8 @@ def training_loop(
             val_loss[epoch] = infer(net, validation, criterion)
     if test:
         test_loss = infer(net, test, criterion)
-        
-    print('number of epoch', epoch, 'loss', loss.data)        
+
+    print('number of epoch', epoch, 'loss', loss.data)
 
     print(f"Done training for {args.num_epochs} epochs.")
     print(
@@ -149,7 +149,7 @@ def training_loop(
         f"auc by epochs "
         f"\n\t{auc_per_epoch} \n\tover the training epochs, respectively."
     )
-    
+
     return tr_loss, val_loss, test_loss, untrained_test_loss
 
 
@@ -165,31 +165,33 @@ def plot_loss_graph(loss_list):
     plt.show()
 
 
-def plot_decision_boundary(x,y,net,hidden_layers):
+def plot_decision_boundary(x, y, net, hidden_layers):
     z = np.linspace(-3, 3, 50)
     w = np.linspace(-3, 3, 40)
     mesh = np.meshgrid(z, w)
-    a=np.zeros((2000,2))
-    a[:,0]=np.ravel(mesh[0])
-    a[:,1]=np.ravel(mesh[1])
-    contour_test=torch.Tensor(a)
+    a = np.zeros((2000, 2))
+    a[:, 0] = np.ravel(mesh[0])
+    a[:, 1] = np.ravel(mesh[1])
+    contour_test = torch.Tensor(a)
     predict_out = net(contour_test)
-    contour_plot=predict_out.detach().numpy()  
+    contour_plot = predict_out.detach().numpy()
     cmap = sns.diverging_palette(250, 12, s=85, l=25, as_cmap=True)
     fig, ax = plt.subplots(figsize=(8, 5))
-    contour=ax.contourf(mesh[0], mesh[1], contour_plot.reshape(40,50),20, cmap=cmap)
+    contour = ax.contourf(
+        mesh[0], mesh[1], contour_plot.reshape(40, 50), 20, cmap=cmap)
     cbar = plt.colorbar(contour)
-    ax.scatter(x[y==0, 0], x[y==0, 1], label='Class 0')
-    ax.scatter(x[y==1, 0], x[y==1, 1], color='r', label='Class 1')
-    sns.despine(); ax.legend()
+    ax.scatter(x[y == 0, 0], x[y == 0, 1], label='Class 0')
+    ax.scatter(x[y == 1, 0], x[y == 1, 1], color='r', label='Class 1')
+    sns.despine()
+    ax.legend()
     ax.set(xlabel='X', ylabel='Y', title='NN with {} layers'.format(hidden_layers))
     plt.show()
 
 
 in_features = x_train.shape[1]
-hidden_size=10
-net = MlpLogisticClassifier(in_features,hidden_size)
-args = MlpArgs(5e-1, 50)
+hidden_size = 10
+net = MlpLogisticClassifier(in_features, hidden_size)
+args = MlpArgs(5e-1, 20)
 tr_loss, val_loss, test_loss, untrained_test_loss = training_loop(args,
                                                                   net,
                                                                   (x_train,
@@ -201,4 +203,4 @@ tr_loss, val_loss, test_loss, untrained_test_loss = training_loop(args,
 plot_loss_graph(tr_loss)
 
 
-plot_decision_boundary(x,y,net,hidden_size)
+plot_decision_boundary(x, y, net, hidden_size)
