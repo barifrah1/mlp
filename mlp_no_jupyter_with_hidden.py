@@ -81,7 +81,7 @@ def infer(net, data, criterion):
         with torch.no_grad():
             pred = net(x).float()
             predictions[i] = pred
-            loss = criterion(pred, y).item()
+            loss = criterion(torch.tensor(pred.item()), y).item()
         running_loss += loss
     auc = roc_auc_score(data[1], predictions)
     return [running_loss / len(data[0]), auc]
@@ -120,7 +120,7 @@ def training_loop(
             optimizer.zero_grad()
             pred = net(x)
             predictions[i] = pred
-            loss = criterion(pred, y)
+            loss = criterion(pred, torch.tensor([y]))
             loss.backward()
             optimizer.step()
             running_tr_loss += loss
@@ -149,8 +149,8 @@ def training_loop(
         f"auc by epochs "
         f"\n\t{auc_per_epoch} \n\tover the training epochs, respectively."
     )
-
-    return tr_loss, val_loss, test_loss, untrained_test_loss
+    
+    return  tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch
 
 
 def plot_loss_graph(loss_list):
@@ -189,16 +189,16 @@ def plot_decision_boundary(x, y, net, hidden_layers):
 
 
 in_features = x_train.shape[1]
-hidden_size = 10
-net = MlpLogisticClassifier(in_features, hidden_size)
-args = MlpArgs(5e-1, 20)
+hidden_size=10
+net = MlpLogisticClassifier(in_features,hidden_size)
+args = MlpArgs(1e-1, 20)
 tr_loss, val_loss, test_loss, untrained_test_loss = training_loop(args,
                                                                   net,
                                                                   (x_train,
                                                                    y_train),
                                                                   None,
                                                                   (x_test, y_test),
-                                                                  nn.MSELoss
+                                                                  nn.BCELoss
                                                                   )
 plot_loss_graph(tr_loss)
 
