@@ -77,8 +77,34 @@ class MlpLogisticClassifierWithHidden(nn.Module):
         x=torch.sigmoid(self.output(x))
         return x
 
+class MlpRegression(nn.Module):
+    def __init__(self, in_features,hidden_size,n_output):
+        super(MlpRegression, self).__init__()
+        self.fc1=nn.Linear(in_features,hidden_size)
+        self.output=nn.Linear(hidden_size,n_output)
+        
+    def forward(self, x):
+        x=F.relu(self.fc1(x))
+        x=self.output(x)
+        return x
+
 # infer function
 
+def preproccess(x,y,z):
+    x1,y1,z1=np.ravel(x),np.ravel(y),np.ravel(z)
+    s=(x1.shape[0],2)
+    t=np.zeros(s)
+    for i in range(len(z)):
+        t[i][0]=x1[i]
+        t[i][1]=y1[i]
+    X=t
+    Y=z1
+    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.25)
+    x_train = torch.from_numpy(x_train).float()
+    y_train = torch.from_numpy(y_train).float()
+    x_test = torch.from_numpy(x_test).float()
+    y_test = torch.from_numpy(y_test).float()
+    return x_train, x_test, y_train, y_test
 
 def infer(net, data, criterion):
     net.eval()
@@ -93,6 +119,8 @@ def infer(net, data, criterion):
             predictions[i] = pred
             loss = criterion(torch.tensor(pred.item()), y).item()
         running_loss += loss
+    if isinstance (net,MlpRegression):
+        return running_loss / len(data[0])
     auc = roc_auc_score(data[1], predictions)
     return [running_loss / len(data[0]), auc]
 
@@ -113,6 +141,8 @@ def training_loop(
     criterion: the loss function
     optimizer: the optimizer to be used"""
     criterion = criterion_func()
+    if  isinstance (net,MlpRegression):
+        criterion = nn.MSELoss()
     optimizer = optimizer_func(net.parameters(), lr=args.lr)
     tr_loss, val_loss, auc_per_epoch, test_auc_per_epoch = [
         None] * args.num_epochs, [None] * args.num_epochs, [None] * args.num_epochs, [None] * args.num_epochs
@@ -135,37 +165,42 @@ def training_loop(
             optimizer.step()
             running_tr_loss += loss
         tr_loss[epoch] = running_tr_loss.item() / len(train[0])
-        auc_per_epoch[epoch] = roc_auc_score(train[1], predictions)
+        if not isinstance (net,MlpRegression):
+            auc_per_epoch[epoch] = roc_auc_score(train[1], predictions)
         if validation:
-            val_loss[epoch], test_auc_per_epoch[epoch] = infer(
-                net, validation, criterion)
+            if not isinstance (net,MlpRegression):
+                val_loss[epoch], test_auc_per_epoch[epoch] = infer(net, validation, criterion)
+            else:
+                val_loss[epoch] = infer(net, validation, criterion)
+            
 
     if test:
         test_loss = infer(net, test, criterion)
 
     print(f"Done training for {args.num_epochs} epochs.")
-    print(
-        f"The BCELoss is {untrained_test_loss[0]:.2e} before training and {test_loss[0]:.2e} after training."
-    )
-    print(
-        f"The auc is {untrained_test_loss[1]:.2e} before training and {test_loss[1]:.2e} after training."
-    )
+    #print(
+    #    f"The BCELoss is {untrained_test_loss[0]:.2e} before training and {test_loss[0]:.2e} after training")
+    if not isinstance (net,MlpRegression):
+        print(
+            f"The auc is {untrained_test_loss[1]:.2e} before training and {test_loss[1]:.2e} after training."
+        )
     print(
         f"The training and validation losses are "
         f"\n\t{tr_loss}, \n\t{val_loss}, \n\tover the training epochs, respectively."
     )
+    if not isinstance (net,MlpRegression):
+        print(
+            f"training auc by epochs "
+            f"\n\t{auc_per_epoch} \n\tover the training epochs, respectively."
+        )
+        print(
+            f"test auc by epochs "
+            f"\n\t{test_auc_per_epoch} \n\tover the training epochs, respectively."
+        )
 
-    print(
-        f"training auc by epochs "
-        f"\n\t{auc_per_epoch} \n\tover the training epochs, respectively."
-    )
-    print(
-        f"test auc by epochs "
-        f"\n\t{test_auc_per_epoch} \n\tover the training epochs, respectively."
-    )
-
-    return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch
-
+    if not isinstance (net,MlpRegression):
+        return tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch
+    return tr_loss, val_loss, test_loss, untrained_test_loss
 
 def plot_loss_graph(loss_list, train_or_val: str):
     loss_values = loss_list
@@ -241,7 +276,7 @@ def plot_decision_boundary_nonlinear(x,y,net,hidden_layers):
     
 in_features = x_train.shape[1]
 net = MlpLogisticClassifier(in_features)
-args = MlpArgs(2e-2, 50)
+args = MlpArgs(2e-2, 10)
 tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch = training_loop(args,
                                                                                                      net,
                                                                                                      (x_train,
@@ -284,3 +319,31 @@ plot_auc_graph(auc_per_epoch, "training")
 plot_auc_graph(test_auc_per_epoch, "validation")
 plot_decision_boundary_nonlinear(x,y,net,hidden_size)
 print("end!")
+
+
+# -----------------------------regrresion 
+np.random.seed(random_num)
+x = np.linspace(-5, 5, 30)
+y = np.linspace(-5, 5, 30)
+xx, yy = np.meshgrid(x, y)
+z = np.sin(xx) * np.cos(yy) + 0.1 * np.random.rand(xx.shape[0], xx.shape[1])
+x_train, x_test, y_train, y_test=preproccess(xx,yy,z)
+in_features=2
+hidden_size=10
+n_output=1
+net=MlpRegression(in_features,hidden_size,n_output)
+args = MlpArgs(2e-4, 20)
+tr_loss, val_loss, test_loss, untrained_test_loss= training_loop(args,
+                                                                                                     net,
+                                                                                                     (x_train,
+                                                                                                      y_train),
+                                                                                                     (x_test,
+                                                                                                      y_test),
+                                                                                                     (x_test,
+                                                                                                      y_test),
+                                                                                                     nn.MSELoss
+                                                                                                     )
+
+
+plot_loss_graph(tr_loss, "training")
+plot_loss_graph(val_loss, "validation")
