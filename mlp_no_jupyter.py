@@ -105,7 +105,7 @@ def preproccess(x, y, z):
     x1, y1, z1 = np.ravel(x), np.ravel(y), np.ravel(z)
     s = (x1.shape[0], 2)
     t = np.zeros(s)
-    for i in range(len(z)):
+    for i in range(len(z1)):
         t[i][0] = x1[i]
         t[i][1] = y1[i]
     X = t
