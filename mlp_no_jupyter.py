@@ -83,10 +83,18 @@ class MlpRegression(nn.Module):
     def __init__(self, in_features, hidden_size, n_output):
         super(MlpRegression, self).__init__()
         self.fc1 = nn.Linear(in_features, hidden_size)
-        self.output = nn.Linear(hidden_size, n_output)
+        self.fc2 = nn.Linear(hidden_size, int(hidden_size/2))
+        self.fc3 = nn.Linear(int(hidden_size/2), int(hidden_size/4))
+        self.fc4 = nn.Linear(int(hidden_size/4), int(hidden_size/8))
+        self.fc5 = nn.Linear(int(hidden_size/8), int(hidden_size/16))
+        self.output = nn.Linear(int(hidden_size/16), n_output)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = F.relu(self.fc4(x))
+        x = F.relu(self.fc5(x))
         x = self.output(x)
         return x
 
@@ -97,7 +105,7 @@ def preproccess(x, y, z):
     x1, y1, z1 = np.ravel(x), np.ravel(y), np.ravel(z)
     s = (x1.shape[0], 2)
     t = np.zeros(s)
-    for i in range(len(z)):
+    for i in range(len(z1)):
         t[i][0] = x1[i]
         t[i][1] = y1[i]
     X = t
@@ -114,7 +122,7 @@ def infer(net, data, criterion):
     net.eval()
     running_loss = 0
     auc = 0
-    predictions = len(data[1])*[None]
+    predictions = [None] * len(data[1])
     for i in range(len(data[0])):
         x = data[0][i]
         y = data[1][i].float()
@@ -136,7 +144,7 @@ def training_loop(
     validation=None,
     test=None,
     criterion_func=nn.BCELoss,
-    optimizer_func=torch.optim.SGD,
+    optimizer_func=torch.optim.Adam,
 ):
     """The training runs here.
     args: a class instance that contains the arguments
@@ -144,7 +152,7 @@ def training_loop(
     tr_loader, val_loader, test_loader: dataloaders for the train, validation and test sets
     criterion: the loss function
     optimizer: the optimizer to be used"""
-    criterion = criterion_func()
+    criterion = criterion_func()עןא
     if isinstance(net, MlpRegression):
         criterion = nn.MSELoss()
     optimizer = optimizer_func(net.parameters(), lr=args.lr)
@@ -307,10 +315,9 @@ def plot_decision_boundary_nonlinear(x, y, net, hidden_layers):
 in_features = x_train.shape[1]
 net = MlpLogisticClassifier(in_features)
 args = MlpArgs(2e-2, 10)
-trainXandYTuple = (X_train, Y_train)
-testXandYTuple = (X_test, Y_test)
-tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr =
-training_loop(args, net, trainXandYTuple, testXandYTuple, nn.BCELoss)
+trainXandYTuple = (x_train, y_train) # create train and test tuples
+testXandYTuple = (x_test, y_test)
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr = training_loop(args,net,trainXandYTuple,testXandYTuple,testXandYTuple,nn.BCELoss)
 """                                                                                                                        
                                                                                                                             (x_train,
                                                                                                                              y_train),
@@ -336,18 +343,10 @@ plot_decision_boundary(bias, a1, a2, x, y)
 # ----------------- hidden net
 hidden_size = 15
 args = MlpArgs(2e-2, 50)
+trainXandYTuple = (x_train, y_train) # create train and test tuples
+testXandYTuple = (x_test, y_test)
 net = MlpLogisticClassifierWithHidden(in_features, hidden_size)
-tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr = training_loop(args,
-                                                                                                                         net,
-                                                                                                                         (x_train,
-                                                                                                                          y_train),
-                                                                                                                         (x_test,
-                                                                                                                          y_test),
-                                                                                                                         (x_test,
-                                                                                                                          y_test),
-                                                                                                                         nn.BCELoss
-                                                                                                                         )
-
+tr_loss, val_loss, test_loss, untrained_test_loss, auc_per_epoch, test_auc_per_epoch, test_fpr, test_tpr = training_loop(args,net,trainXandYTuple,testXandYTuple,testXandYTuple,nn.BCELoss)
 plot_loss_graph(tr_loss, "training")
 plot_loss_graph(val_loss, "validation")
 plot_auc_graph(auc_per_epoch, "training")
@@ -365,10 +364,10 @@ xx, yy = np.meshgrid(x, y)
 z = np.sin(xx) * np.cos(yy) + 0.1 * np.random.rand(xx.shape[0], xx.shape[1])
 x_train, x_test, y_train, y_test = preproccess(xx, yy, z)
 in_features = 2
-hidden_size = 30
+hidden_size = 64
 n_output = 1
 net = MlpRegression(in_features, hidden_size, n_output)
-args = MlpArgs(2e-4, 50)
+args = MlpArgs(4e-4, 50)
 tr_loss, val_loss, test_loss, untrained_test_loss = training_loop(args,
                                                                   net,
                                                                   (x_train,
